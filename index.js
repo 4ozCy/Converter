@@ -1,8 +1,8 @@
 const express = require('express');
 const path = require('path');
-const ytdlp = require('yt-dlp-exec');
+const ytdl = require('node-ytdl-core');
+const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
-const { exec } = require('child_process');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -18,19 +18,31 @@ app.post('/convert', (req, res) => {
     }
 
     const outputFile = path.resolve(__dirname, `output.${format}`);
-    
-    const formatFlag = format === 'mp3' ? '--extract-audio --audio-format mp3' : '--format mp4';
 
-    const command = `yt-dlp ${formatFlag} -o ${outputFile} ${youtubeUrl}`;
+    let stream = ytdl(youtubeUrl, { quality: 'highest' });
 
-    exec(command, (error, stdout, stderr) => {
-        if (error) {
-            console.error(`Error: ${stderr}`);
-            return res.status(500).json({ success: false, message: 'Conversion failed' });
-        }
-
-        return res.json({ success: true, downloadUrl: `/output.${format}` });
-    });
+    if (format === 'mp3') {
+        ffmpeg(stream)
+            .audioCodec('libmp3lame')
+            .toFormat('mp3')
+            .save(outputFile)
+            .on('end', () => {
+                res.json({ success: true, downloadUrl: `/output.${format}` });
+            })
+            .on('error', (err) => {
+                console.error(`Error: ${err.message}`);
+                res.status(500).json({ success: false, message: 'Conversion failed' });
+            });
+    } else {
+        stream.pipe(fs.createWriteStream(outputFile))
+            .on('finish', () => {
+                res.json({ success: true, downloadUrl: `/output.${format}` });
+            })
+            .on('error', (err) => {
+                console.error(`Error: ${err.message}`);
+                res.status(500).json({ success: false, message: 'Download failed' });
+            });
+    }
 });
 
 app.listen(port, () => {
