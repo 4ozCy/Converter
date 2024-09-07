@@ -1,6 +1,6 @@
 const express = require('express');
 const path = require('path');
-const ytdl = require('node-ytdl-core');
+const ytdl = require('ytdl-core');
 const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
 
